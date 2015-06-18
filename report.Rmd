@@ -1,0 +1,89 @@
+---
+title: "Tooth Growth Analysis"
+author: "Ran Ju"
+output:
+  pdf_document:
+    toc: false
+---
+# Exploratory Data Analysis
+```{r}
+# Load library and data
+library(ggplot2)
+data(ToothGrowth)
+tg <- ToothGrowth
+# Fix the seed for reproducibility
+set.seed(344344)
+```
+```{r}
+# Box plot of len against supp
+ggplot(data = tg, aes(x = supp, y = len)) +
+  geom_boxplot(aes(fill = supp)) +
+  geom_jitter() +
+  ggtitle("Tooth Length by Supplement Type")
+```
+```{r}
+# Box plot of len against dose
+ggplot(data = tg, aes(x = factor(dose), y = len)) +
+  geom_boxplot(aes(fill = factor(dose))) +
+  geom_jitter() +
+  ggtitle("Tooth Length by Dose")
+```
+```{r}
+qplot(dose, len, data=tg, geom=c("point", "smooth"), 
+      method="lm", formula=y~x, color=supp,
+      main="Regression of Tooth Lengh on Dose", 
+      xlab="Dose", ylab="Tooth Length")
+```
+
+It seems that orange juice is better for tooth length than ascorbic acid, and the more vitamin C the higher the tooth length.
+
+# Is tooth length related to supplement?
+Define $H_0$ as $E[len|supp = OJ] = E[len|supp = VC] = E[len]$ with $\alpha = 0.05$.  Use resampling to create 10000 simulations, and compute the difference of mean of OJ and VC for each sample.
+```{r}
+n = dim(tg)[1]
+B = 10000
+means <- NULL
+for (i in 1:B) {
+  # Sample with replacement
+  ri <- sample.int(n, n, replace = T)
+  t <- tg[ri, ]
+  # Compute the difference of the mean values
+  means <- c(means, mean(t[t[, "supp"] == "VC", "len"]) - mean(t[t[, "supp"] == "OJ", "len"]))
+}
+ggplot() +
+  geom_histogram(aes(x = means), alpha = 0.5, binwidth = 0.25) +
+  geom_vline(aes(xintercept = median(means)), color = "red") +
+  ggtitle("Distribution of mean(len of VC) - mean(len of OJ)")
+# Compute the median
+median(means)
+```
+The plot shows the distribution of the means (the vertical line is the median), and it is less than 0 with probability
+```{r}
+# Compute the weight of mean >= 0
+sum(means >= 0) / B
+```
+Because the probability is less than $\alpha = 0.05$, we reject $H_0$.
+
+# Is tooth growth related to dose?
+We perform a t-test between each pair of dose levels.  
+```{r}
+t05 <- tg[tg$dose == 0.5, "len"]
+t1 <- tg[tg$dose == 1, "len"]
+t2 <- tg[tg$dose == 2, "len"]
+```
+```{r}
+# Compare dose = 0.5 and 1
+t.test(t05, t1, alternative = "less")
+```
+```{r}
+# Compare dose = 1 and 2
+t.test(t1, t2, alternative = "less")
+```
+```{r}
+# Compare dose = 0.5 and 2
+t.test(t05, t2, alternative = "less")
+```
+The p-values are all well below $\alpha = 0.05$, hence we conclude that VC dose has a positive effect on tooth growth, assuming _len_ has a normal distribution in each group.
+
+# Conclusion
+Tooth length is higher among the individuals fed with orange juice than ascorbic acid, and VC dose has a a positive correlation with tooth growth.  However, more analysis is need to quantify the relationship, which requires regression analysis.
